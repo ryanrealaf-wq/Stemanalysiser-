@@ -32,7 +32,14 @@ jobs:
         run: ./gradlew assembleDebug
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'android' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
+        run: |
+          if [ ! -f my-upload-key.jks ]; then
+            keytool -genkeypair -v -keystore my-upload-key.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass "$STORE_PASSWORD" -keypass "$KEY_PASSWORD" -dname "CN=Android, OU=Android, O=Android, L=Mountain View, ST=CA, C=US"
+          fi
+          ./gradlew assembleRelease
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
@@ -44,4 +51,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          path: app/build/outputs/apk/release/*.apk
