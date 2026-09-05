@@ -1,8 +1,11 @@
 package com.example
 
+import com.example.audiomidi.api.dsp.BpmEstimator
+import com.example.audiomidi.api.dsp.KeyEstimator
 import com.example.audiomidi.api.dsp.YinPitchDetector
 import com.example.audiomidi.api.midi.StandardMidiFileWriter
 import com.example.audiomidi.api.model.MidiNote
+import com.example.audiomidi.api.model.QuantizationMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,6 +29,11 @@ class ExampleUnitTest {
     // Frequency calculation
     val freqA4 = MidiNote.midiToFreq(69)
     assertEquals(440.0f, freqA4, 0.01f)
+
+    // Boundaries
+    val lowC = MidiNote.freqToMidi(32.7f)
+    assertEquals(24, lowC) // C1
+    assertEquals("C1", MidiNote.midiToName(24))
   }
 
   @Test
@@ -87,5 +95,49 @@ class ExampleUnitTest {
 
     assertTrue("YIN probability should be high on pure tone", result.probability > 0.8f)
     assertEquals(targetFreq.toFloat(), result.pitchHz, 5.0f)
+  }
+
+  @Test
+  fun testKeyEstimationCMajor() {
+    // C Major scale notes: C4 (60), D4 (62), E4 (64), F4 (65), G4 (67), A4 (69), B4 (71), C5 (72)
+    val notes = listOf(60, 62, 64, 65, 67, 69, 71, 72).mapIndexed { idx, pitch ->
+      MidiNote(
+        noteNumber = pitch,
+        pitchName = MidiNote.midiToName(pitch),
+        frequencyHz = MidiNote.midiToFreq(pitch),
+        startTimeMs = (idx * 500).toLong(),
+        durationMs = 400L,
+        velocity = if (pitch == 60 || pitch == 67 || pitch == 64) 110 else 80 // Emphasize C, E, G tonic triad
+      )
+    }
+
+    val estimatedKey = KeyEstimator.estimateKey(notes)
+    assertTrue("Estimated key should be C Major but was $estimatedKey", estimatedKey.contains("C Major"))
+  }
+
+  @Test
+  fun testBpmEstimation() {
+    // Sequence of 8 notes spaced evenly by 500ms -> 120 BPM
+    val notes = (0 until 8).map { idx ->
+      MidiNote(
+        noteNumber = 60,
+        pitchName = "C4",
+        frequencyHz = 261.63f,
+        startTimeMs = (idx * 500).toLong(),
+        durationMs = 300L,
+        velocity = 90
+      )
+    }
+
+    val bpm = BpmEstimator.estimateBpm(notes, defaultBpm = 100)
+    assertEquals(120, bpm)
+  }
+
+  @Test
+  fun testQuantizationModes() {
+    assertEquals(0, QuantizationMode.NONE.division)
+    assertEquals(4, QuantizationMode.QUARTER.division)
+    assertEquals(8, QuantizationMode.EIGHTH.division)
+    assertEquals(16, QuantizationMode.SIXTEENTH.division)
   }
 }
